@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:polka/core/theme/app_theme.dart';
 
 void main() {
   runApp(const PolkaApp());
@@ -12,6 +13,8 @@ class PolkaApp extends StatelessWidget {
     return MaterialApp(
       title: 'Полка',
       debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
       home: const PolkaHomePage(),
     );
   }
