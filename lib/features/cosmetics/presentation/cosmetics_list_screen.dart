@@ -4,6 +4,7 @@ import 'package:polka/features/cosmetics/logic/item_status_calculator.dart';
 import 'package:polka/features/cosmetics/models/cosmetic_category.dart';
 import 'package:polka/features/cosmetics/models/cosmetic_item.dart';
 import 'package:polka/features/cosmetics/models/item_status.dart';
+import 'package:polka/features/cosmetics/presentation/add_cosmetic_screen.dart';
 
 /// Главный экран приложения — список косметических средств.
 class CosmeticsListScreen extends StatefulWidget {
@@ -26,7 +27,26 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
   @override
   void initState() {
     super.initState();
-    _itemsFuture = widget.repository.getAll();
+    _refreshList();
+  }
+
+  void _refreshList() {
+    setState(() {
+      _itemsFuture = widget.repository.getAll();
+    });
+  }
+
+  Future<void> _openAddScreen() async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => AddCosmeticScreen(repository: widget.repository),
+      ),
+    );
+
+    // Если новый экран вернул true, обновляем список
+    if (result == true) {
+      _refreshList();
+    }
   }
 
   @override
@@ -46,22 +66,23 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
             return const _EmptyState();
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: items.length,
-            separatorBuilder: (context, index) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              final status = widget.calculator.calculate(item);
-              return _CosmeticListItem(item: item, status: status);
-            },
+          return RefreshIndicator(
+            onRefresh: () async => _refreshList(),
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: items.length,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final item = items[index];
+                final status = widget.calculator.calculate(item);
+                return _CosmeticListItem(item: item, status: status);
+              },
+            ),
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Заглушка — добавление средства добавим позже
-        },
+        onPressed: _openAddScreen,
         child: const Icon(Icons.add),
       ),
     );
