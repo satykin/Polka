@@ -50,9 +50,7 @@ class _AddCosmeticScreenState extends State<AddCosmeticScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Новое средство'),
-      ),
+      appBar: AppBar(title: const Text('Новое средство')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(

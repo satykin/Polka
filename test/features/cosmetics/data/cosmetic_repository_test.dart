@@ -1,15 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:polka/features/cosmetics/data/cosmetic_repository.dart';
+import 'package:polka/features/cosmetics/data/in_memory_cosmetic_repository.dart';
 import 'package:polka/features/cosmetics/models/cosmetic_category.dart';
 import 'package:polka/features/cosmetics/models/cosmetic_item.dart';
 
 void main() {
-  group('CosmeticRepository', () {
-    late CosmeticRepository repository;
+  group('InMemoryCosmeticRepository', () {
+    late InMemoryCosmeticRepository repository;
     final now = DateTime(2026, 9, 9);
 
     setUp(() {
-      repository = CosmeticRepository();
+      repository = InMemoryCosmeticRepository();
     });
 
     CosmeticItem createItem(String id) {
