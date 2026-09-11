@@ -1,68 +1,63 @@
 import 'package:flutter/material.dart';
+import 'package:polka/features/cosmetics/data/cosmetic_repository.dart';
+import 'package:polka/features/cosmetics/logic/item_status_calculator.dart';
 import 'package:polka/features/cosmetics/models/cosmetic_category.dart';
 import 'package:polka/features/cosmetics/models/cosmetic_item.dart';
+import 'package:polka/features/cosmetics/models/item_status.dart';
 
 /// Главный экран приложения — список косметических средств.
-class CosmeticsListScreen extends StatelessWidget {
-  const CosmeticsListScreen({super.key});
+class CosmeticsListScreen extends StatefulWidget {
+  final CosmeticRepository repository;
+  final ItemStatusCalculator calculator;
 
-  /// Статические тестовые данные для демонстрации UI.
-  /// Позже будут заменены на реальные данные из репозитория.
-  static final List<CosmeticItem> _mockItems = [
-    CosmeticItem(
-      id: '1',
-      name: 'Увлажняющий крем',
-      category: CosmeticCategory.face,
-      openedAt: DateTime(2026, 8, 1),
-      paoMonths: 12,
-      lastUsedAt: DateTime(2026, 9, 8),
-      createdAt: DateTime(2026, 8, 1),
-      updatedAt: DateTime(2026, 9, 8),
-    ),
-    CosmeticItem(
-      id: '2',
-      name: 'Тушь для ресниц',
-      category: CosmeticCategory.makeup,
-      openedAt: DateTime(2026, 5, 15),
-      paoMonths: 3,
-      lastUsedAt: DateTime(2026, 9, 7),
-      createdAt: DateTime(2026, 5, 15),
-      updatedAt: DateTime(2026, 9, 7),
-    ),
-    CosmeticItem(
-      id: '3',
-      name: 'Шампунь',
-      category: CosmeticCategory.hair,
-      openedAt: DateTime(2026, 7, 10),
-      paoMonths: 18,
-      createdAt: DateTime(2026, 7, 10),
-      updatedAt: DateTime(2026, 7, 10),
-    ),
-    CosmeticItem(
-      id: '4',
-      name: 'Солнцезащитный крем',
-      category: CosmeticCategory.sunCare,
-      createdAt: DateTime(2026, 6, 1),
-      updatedAt: DateTime(2026, 6, 1),
-    ),
-  ];
+  const CosmeticsListScreen({
+    super.key,
+    required this.repository,
+    required this.calculator,
+  });
+
+  @override
+  State<CosmeticsListScreen> createState() => _CosmeticsListScreenState();
+}
+
+class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
+  late Future<List<CosmeticItem>> _itemsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _itemsFuture = widget.repository.getAll();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Полка'),
+      appBar: AppBar(title: const Text('Полка')),
+      body: FutureBuilder<List<CosmeticItem>>(
+        future: _itemsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final items = snapshot.data ?? [];
+
+          if (items.isEmpty) {
+            return const _EmptyState();
+          }
+
+          return ListView.separated(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: items.length,
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              final status = widget.calculator.calculate(item);
+              return _CosmeticListItem(item: item, status: status);
+            },
+          );
+        },
       ),
-      body: _mockItems.isEmpty
-          ? const _EmptyState()
-          : ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: _mockItems.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                return _CosmeticListItem(item: _mockItems[index]);
-              },
-            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           // Заглушка — добавление средства добавим позже
@@ -86,27 +81,24 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.spa_outlined,
             size: 80,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            color: Theme.of(context).colorScheme.onSurface
+                .withValues(alpha: 0.3),
           ),
           const SizedBox(height: 16),
           Text(
             'Полка пуста',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.6),
-                ),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.6),
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Добавьте своё первое средство',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.5),
-                ),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.5),
+            ),
           ),
         ],
       ),
@@ -117,8 +109,9 @@ class _EmptyState extends StatelessWidget {
 /// Элемент списка косметического средства.
 class _CosmeticListItem extends StatelessWidget {
   final CosmeticItem item;
+  final ItemStatus status;
 
-  const _CosmeticListItem({required this.item});
+  const _CosmeticListItem({required this.item, required this.status});
 
   @override
   Widget build(BuildContext context) {
@@ -132,29 +125,12 @@ class _CosmeticListItem extends StatelessWidget {
           color: colorScheme.onPrimaryContainer,
         ),
       ),
-      title: Text(
-        item.name,
-        style: Theme.of(context).textTheme.titleMedium,
-      ),
+      title: Text(item.name, style: Theme.of(context).textTheme.titleMedium),
       subtitle: Text(
         item.category.displayName,
         style: Theme.of(context).textTheme.bodyMedium,
       ),
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: colorScheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(
-          'Скоро',
-          style: TextStyle(
-            color: colorScheme.onSecondaryContainer,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
+      trailing: _StatusBadge(status: status),
     );
   }
 
@@ -173,5 +149,52 @@ class _CosmeticListItem extends StatelessWidget {
       case CosmeticCategory.other:
         return Icons.inventory_2;
     }
+  }
+}
+
+/// Цветной бейдж статуса средства.
+class _StatusBadge extends StatelessWidget {
+  final ItemStatus status;
+
+  const _StatusBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bgColor;
+    final Color textColor;
+
+    switch (status) {
+      case ItemStatus.expired:
+        bgColor = Colors.red.shade100;
+        textColor = Colors.red.shade900;
+      case ItemStatus.expiringSoon:
+        bgColor = Colors.orange.shade100;
+        textColor = Colors.orange.shade900;
+      case ItemStatus.active:
+        bgColor = Colors.green.shade100;
+        textColor = Colors.green.shade900;
+      case ItemStatus.idle:
+        bgColor = Colors.grey.shade200;
+        textColor = Colors.grey.shade800;
+      case ItemStatus.unopened:
+        bgColor = Colors.blue.shade100;
+        textColor = Colors.blue.shade900;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        status.displayName,
+        style: TextStyle(
+          color: textColor,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
   }
 }
