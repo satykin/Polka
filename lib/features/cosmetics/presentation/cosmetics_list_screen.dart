@@ -53,15 +53,18 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
     await widget.repository.delete(item.id);
     _refreshList();
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('«${item.name}» удалено')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('«${item.name}» удалено')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Полка')),
+      appBar: AppBar(
+        title: const Text('Полка'),
+      ),
       body: FutureBuilder<List<CosmeticItem>>(
         future: _itemsFuture,
         builder: (context, snapshot) {
@@ -88,8 +91,8 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
                   key: ValueKey(item.id),
                   endActionPane: ActionPane(
                     motion: const BehindMotion(),
-                    // Красная зона открывается максимум на половину строки
-                    extentRatio: 0.5,
+                    // Красная зона открывается на одну пятую строки
+                    extentRatio: 0.2,
                     children: [
                       CustomSlidableAction(
                         backgroundColor: Colors.red,
@@ -126,24 +129,27 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.spa_outlined,
             size: 80,
-            color: Theme.of(context).colorScheme.onSurface
-                .withValues(alpha: 0.3),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
           ),
           const SizedBox(height: 16),
           Text(
             'Полка пуста',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface
-                  .withValues(alpha: 0.6),
-            ),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6),
+                ),
           ),
           const SizedBox(height: 8),
           Text(
             'Добавьте своё первое средство',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface
-                  .withValues(alpha: 0.5),
-            ),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.5),
+                ),
           ),
         ],
       ),
@@ -170,7 +176,10 @@ class _CosmeticListItem extends StatelessWidget {
           color: colorScheme.onPrimaryContainer,
         ),
       ),
-      title: Text(item.name, style: Theme.of(context).textTheme.titleMedium),
+      title: Text(
+        item.name,
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
       subtitle: Text(
         item.category.displayName,
         style: Theme.of(context).textTheme.bodyMedium,
