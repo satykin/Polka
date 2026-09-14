@@ -49,6 +49,20 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
     }
   }
 
+  Future<void> _markAsUsed(CosmeticItem item) async {
+    final now = DateTime.now();
+    final updatedItem = item.copyWith(lastUsedAt: now, updatedAt: now);
+    await widget.repository.update(updatedItem);
+    _refreshList();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('«${item.name}» отмечено как использованное'),
+        ),
+      );
+    }
+  }
+
   Future<void> _deleteItem(CosmeticItem item) async {
     await widget.repository.delete(item.id);
     _refreshList();
@@ -89,9 +103,21 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
                 final status = widget.calculator.calculate(item);
                 return Slidable(
                   key: ValueKey(item.id),
+                  // Свайп ВПРАВО — зелёная зона «отметить как использованное»
+                  startActionPane: ActionPane(
+                    motion: const BehindMotion(),
+                    extentRatio: 0.2,
+                    children: [
+                      CustomSlidableAction(
+                        backgroundColor: Colors.green,
+                        onPressed: (context) => _markAsUsed(item),
+                        child: const Icon(Icons.check, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  // Свайп ВЛЕВО — красная зона «удалить»
                   endActionPane: ActionPane(
                     motion: const BehindMotion(),
-                    // Красная зона открывается на одну пятую строки
                     extentRatio: 0.2,
                     children: [
                       CustomSlidableAction(
