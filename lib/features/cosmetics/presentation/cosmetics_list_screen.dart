@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:polka/features/cosmetics/data/cosmetic_repository.dart';
 import 'package:polka/features/cosmetics/logic/item_status_calculator.dart';
 import 'package:polka/features/cosmetics/models/cosmetic_category.dart';
@@ -43,9 +44,17 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
       ),
     );
 
-    // Если новый экран вернул true, обновляем список
     if (result == true) {
       _refreshList();
+    }
+  }
+
+  Future<void> _deleteItem(CosmeticItem item) async {
+    await widget.repository.delete(item.id);
+    _refreshList();
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('«${item.name}» удалено')));
     }
   }
 
@@ -75,7 +84,22 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
               itemBuilder: (context, index) {
                 final item = items[index];
                 final status = widget.calculator.calculate(item);
-                return _CosmeticListItem(item: item, status: status);
+                return Slidable(
+                  key: ValueKey(item.id),
+                  endActionPane: ActionPane(
+                    motion: const BehindMotion(),
+                    // Красная зона открывается максимум на половину строки
+                    extentRatio: 0.5,
+                    children: [
+                      CustomSlidableAction(
+                        backgroundColor: Colors.red,
+                        onPressed: (context) => _deleteItem(item),
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  child: _CosmeticListItem(item: item, status: status),
+                );
               },
             ),
           );
