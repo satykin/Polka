@@ -6,6 +6,7 @@ import 'package:polka/features/cosmetics/models/cosmetic_category.dart';
 import 'package:polka/features/cosmetics/models/cosmetic_item.dart';
 import 'package:polka/features/cosmetics/models/item_status.dart';
 import 'package:polka/features/cosmetics/presentation/add_cosmetic_screen.dart';
+import 'package:polka/features/cosmetics/presentation/edit_cosmetic_screen.dart';
 
 /// Главный экран приложения — список косметических средств.
 class CosmeticsListScreen extends StatefulWidget {
@@ -49,6 +50,23 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
     }
   }
 
+  Future<void> _openEditScreen(CosmeticItem item) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) =>
+            EditCosmeticScreen(repository: widget.repository, item: item),
+      ),
+    );
+
+    if (result == true) {
+      _refreshList();
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Изменения сохранены')));
+      }
+    }
+  }
+
   Future<void> _markAsUsed(CosmeticItem item) async {
     final now = DateTime.now();
     final updatedItem = item.copyWith(lastUsedAt: now, updatedAt: now);
@@ -56,9 +74,7 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
     _refreshList();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('«${item.name}» отмечено как использованное'),
-        ),
+        SnackBar(content: Text('«${item.name}» отмечено как использованное')),
       );
     }
   }
@@ -67,18 +83,15 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
     await widget.repository.delete(item.id);
     _refreshList();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('«${item.name}» удалено')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('«${item.name}» удалено')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Полка'),
-      ),
+      appBar: AppBar(title: const Text('Полка')),
       body: FutureBuilder<List<CosmeticItem>>(
         future: _itemsFuture,
         builder: (context, snapshot) {
@@ -127,7 +140,11 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
                       ),
                     ],
                   ),
-                  child: _CosmeticListItem(item: item, status: status),
+                  child: _CosmeticListItem(
+                    item: item,
+                    status: status,
+                    onTap: () => _openEditScreen(item),
+                  ),
                 );
               },
             ),
@@ -155,27 +172,24 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.spa_outlined,
             size: 80,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            color: Theme.of(context).colorScheme.onSurface
+                .withValues(alpha: 0.3),
           ),
           const SizedBox(height: 16),
           Text(
             'Полка пуста',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.6),
-                ),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.6),
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Добавьте своё первое средство',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.5),
-                ),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.5),
+            ),
           ),
         ],
       ),
@@ -187,14 +201,20 @@ class _EmptyState extends StatelessWidget {
 class _CosmeticListItem extends StatelessWidget {
   final CosmeticItem item;
   final ItemStatus status;
+  final VoidCallback? onTap;
 
-  const _CosmeticListItem({required this.item, required this.status});
+  const _CosmeticListItem({
+    required this.item,
+    required this.status,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return ListTile(
+      onTap: onTap,
       leading: CircleAvatar(
         backgroundColor: colorScheme.primaryContainer,
         child: Icon(
@@ -202,10 +222,7 @@ class _CosmeticListItem extends StatelessWidget {
           color: colorScheme.onPrimaryContainer,
         ),
       ),
-      title: Text(
-        item.name,
-        style: Theme.of(context).textTheme.titleMedium,
-      ),
+      title: Text(item.name, style: Theme.of(context).textTheme.titleMedium),
       subtitle: Text(
         item.category.displayName,
         style: Theme.of(context).textTheme.bodyMedium,
