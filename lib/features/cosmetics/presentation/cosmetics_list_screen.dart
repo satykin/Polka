@@ -38,6 +38,39 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
     });
   }
 
+  /// Сортирует средства по приоритету статуса, а при равенстве —
+  /// по алфавиту названия.
+  List<CosmeticItem> _sortItems(List<CosmeticItem> items) {
+    final copy = List<CosmeticItem>.from(items);
+    copy.sort((a, b) {
+      final statusA = widget.calculator.calculate(a);
+      final statusB = widget.calculator.calculate(b);
+      final priorityA = _statusPriority(statusA);
+      final priorityB = _statusPriority(statusB);
+      if (priorityA != priorityB) {
+        return priorityA.compareTo(priorityB);
+      }
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return copy;
+  }
+
+  /// Чем меньше число — тем выше средство в списке.
+  int _statusPriority(ItemStatus status) {
+    switch (status) {
+      case ItemStatus.expired:
+        return 0;
+      case ItemStatus.expiringSoon:
+        return 1;
+      case ItemStatus.active:
+        return 2;
+      case ItemStatus.unopened:
+        return 3;
+      case ItemStatus.idle:
+        return 4;
+    }
+  }
+
   Future<void> _openAddScreen() async {
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -53,16 +86,19 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
   Future<void> _openEditScreen(CosmeticItem item) async {
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (context) =>
-            EditCosmeticScreen(repository: widget.repository, item: item),
+        builder: (context) => EditCosmeticScreen(
+          repository: widget.repository,
+          item: item,
+        ),
       ),
     );
 
     if (result == true) {
       _refreshList();
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Изменения сохранены')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Изменения сохранены')),
+        );
       }
     }
   }
@@ -74,7 +110,9 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
     _refreshList();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('«${item.name}» отмечено как использованное')),
+        SnackBar(
+          content: Text('«${item.name}» отмечено как использованное'),
+        ),
       );
     }
   }
@@ -83,15 +121,18 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
     await widget.repository.delete(item.id);
     _refreshList();
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('«${item.name}» удалено')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('«${item.name}» удалено')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Полка')),
+      appBar: AppBar(
+        title: const Text('Полка'),
+      ),
       body: FutureBuilder<List<CosmeticItem>>(
         future: _itemsFuture,
         builder: (context, snapshot) {
@@ -105,18 +146,19 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
             return const _EmptyState();
           }
 
+          final sortedItems = _sortItems(items);
+
           return RefreshIndicator(
             onRefresh: () async => _refreshList(),
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: items.length,
+              itemCount: sortedItems.length,
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
-                final item = items[index];
+                final item = sortedItems[index];
                 final status = widget.calculator.calculate(item);
                 return Slidable(
                   key: ValueKey(item.id),
-                  // Свайп ВПРАВО — зелёная зона «отметить как использованное»
                   startActionPane: ActionPane(
                     motion: const BehindMotion(),
                     extentRatio: 0.2,
@@ -128,7 +170,6 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
                       ),
                     ],
                   ),
-                  // Свайп ВЛЕВО — красная зона «удалить»
                   endActionPane: ActionPane(
                     motion: const BehindMotion(),
                     extentRatio: 0.2,
@@ -172,24 +213,27 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.spa_outlined,
             size: 80,
-            color: Theme.of(context).colorScheme.onSurface
-                .withValues(alpha: 0.3),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
           ),
           const SizedBox(height: 16),
           Text(
             'Полка пуста',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface
-                  .withValues(alpha: 0.6),
-            ),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6),
+                ),
           ),
           const SizedBox(height: 8),
           Text(
             'Добавьте своё первое средство',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface
-                  .withValues(alpha: 0.5),
-            ),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.5),
+                ),
           ),
         ],
       ),
@@ -222,7 +266,10 @@ class _CosmeticListItem extends StatelessWidget {
           color: colorScheme.onPrimaryContainer,
         ),
       ),
-      title: Text(item.name, style: Theme.of(context).textTheme.titleMedium),
+      title: Text(
+        item.name,
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
       subtitle: Text(
         item.category.displayName,
         style: Theme.of(context).textTheme.bodyMedium,
