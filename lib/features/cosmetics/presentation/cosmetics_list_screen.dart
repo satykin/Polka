@@ -29,15 +29,40 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
   /// Выбранный фильтр. null = показать все.
   ItemStatus? _selectedFilter;
 
+  /// Поиск по названию.
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _isSearching = false;
+
   @override
   void initState() {
     super.initState();
     _refreshList();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   void _refreshList() {
     setState(() {
       _itemsFuture = widget.repository.getAll();
+    });
+  }
+
+  void _openSearch() {
+    setState(() {
+      _isSearching = true;
+    });
+  }
+
+  void _closeSearch() {
+    _searchController.clear();
+    setState(() {
+      _isSearching = false;
+      _searchQuery = '';
     });
   }
 
@@ -58,14 +83,25 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
     return copy;
   }
 
-  /// Фильтрует список по выбранному статусу, затем сортирует.
+  /// Применяет фильтр по статусу, затем поиск по названию,
+  /// затем сортировку.
   List<CosmeticItem> _filterAndSortItems(List<CosmeticItem> items) {
-    final filtered = _selectedFilter == null
-        ? items
-        : items.where((item) {
-            return widget.calculator.calculate(item) == _selectedFilter;
-          }).toList();
-    return _sortItems(filtered);
+    var result = items;
+
+    if (_selectedFilter != null) {
+      result = result
+          .where((item) => widget.calculator.calculate(item) == _selectedFilter)
+          .toList();
+    }
+
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      result = result
+          .where((item) => item.name.toLowerCase().contains(query))
+          .toList();
+    }
+
+    return _sortItems(result);
   }
 
   /// Чем меньше число — тем выше средство в списке.
@@ -150,7 +186,49 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Полка')),
+      appBar: AppBar(
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimary,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Поиск по названию...',
+                  hintStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimary
+                        .withValues(alpha: 0.7),
+                  ),
+                  border: InputBorder.none,
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() {
+                        _searchQuery = '';
+                      });
+                    },
+                  ),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+              )
+            : const Text('Полка'),
+        leading: _isSearching
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _closeSearch,
+              )
+            : null,
+        actions: [
+          if (!_isSearching)
+            IconButton(icon: const Icon(Icons.search), onPressed: _openSearch),
+        ],
+      ),
       body: FutureBuilder<List<CosmeticItem>>(
         future: _itemsFuture,
         builder: (context, snapshot) {
@@ -434,7 +512,7 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-/// Виджет пустого состояния при активном фильтре.
+/// Виджет пустого результата при фильтре или поиске.
 class _EmptyFilterState extends StatelessWidget {
   const _EmptyFilterState();
 
@@ -460,7 +538,7 @@ class _EmptyFilterState extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Средств с таким статусом нет',
+            'Попробуйте изменить фильтры или запрос',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurface
                   .withValues(alpha: 0.5),
