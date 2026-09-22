@@ -26,6 +26,9 @@ class CosmeticsListScreen extends StatefulWidget {
 class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
   late Future<List<CosmeticItem>> _itemsFuture;
 
+  /// Выбранный фильтр. null = показать все.
+  ItemStatus? _selectedFilter;
+
   @override
   void initState() {
     super.initState();
@@ -53,6 +56,16 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
     });
     return copy;
+  }
+
+  /// Фильтрует список по выбранному статусу, затем сортирует.
+  List<CosmeticItem> _filterAndSortItems(List<CosmeticItem> items) {
+    final filtered = _selectedFilter == null
+        ? items
+        : items.where((item) {
+            return widget.calculator.calculate(item) == _selectedFilter;
+          }).toList();
+    return _sortItems(filtered);
   }
 
   /// Чем меньше число — тем выше средство в списке.
@@ -86,19 +99,16 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
   Future<void> _openEditScreen(CosmeticItem item) async {
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (context) => EditCosmeticScreen(
-          repository: widget.repository,
-          item: item,
-        ),
+        builder: (context) =>
+            EditCosmeticScreen(repository: widget.repository, item: item),
       ),
     );
 
     if (result == true) {
       _refreshList();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Изменения сохранены')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Изменения сохранены')));
       }
     }
   }
@@ -110,9 +120,7 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
     _refreshList();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('«${item.name}» отмечено как использованное'),
-        ),
+        SnackBar(content: Text('«${item.name}» отмечено как использованное')),
       );
     }
   }
@@ -121,18 +129,28 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
     await widget.repository.delete(item.id);
     _refreshList();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('«${item.name}» удалено')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('«${item.name}» удалено')));
     }
+  }
+
+  /// Подсчёт количества средств для каждого статуса.
+  Map<ItemStatus, int> _countByStatus(List<CosmeticItem> items) {
+    final counts = <ItemStatus, int>{};
+    for (final status in ItemStatus.values) {
+      counts[status] = 0;
+    }
+    for (final item in items) {
+      final status = widget.calculator.calculate(item);
+      counts[status] = (counts[status] ?? 0) + 1;
+    }
+    return counts;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Полка'),
-      ),
+      appBar: AppBar(title: const Text('Полка')),
       body: FutureBuilder<List<CosmeticItem>>(
         future: _itemsFuture,
         builder: (context, snapshot) {
@@ -146,55 +164,233 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
             return const _EmptyState();
           }
 
-          final sortedItems = _sortItems(items);
+          final counts = _countByStatus(items);
+          final displayedItems = _filterAndSortItems(items);
 
-          return RefreshIndicator(
-            onRefresh: () async => _refreshList(),
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: sortedItems.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final item = sortedItems[index];
-                final status = widget.calculator.calculate(item);
-                return Slidable(
-                  key: ValueKey(item.id),
-                  startActionPane: ActionPane(
-                    motion: const BehindMotion(),
-                    extentRatio: 0.2,
-                    children: [
-                      CustomSlidableAction(
-                        backgroundColor: Colors.green,
-                        onPressed: (context) => _markAsUsed(item),
-                        child: const Icon(Icons.check, color: Colors.white),
+          return Column(
+            children: [
+              _FilterChips(
+                selectedFilter: _selectedFilter,
+                counts: counts,
+                onSelected: (filter) {
+                  setState(() {
+                    _selectedFilter = filter;
+                  });
+                },
+              ),
+              Expanded(
+                child: displayedItems.isEmpty
+                    ? const _EmptyFilterState()
+                    : RefreshIndicator(
+                        onRefresh: () async => _refreshList(),
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemCount: displayedItems.length,
+                          separatorBuilder: (context, index) =>
+                              const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final item = displayedItems[index];
+                            final status = widget.calculator.calculate(item);
+                            return Slidable(
+                              key: ValueKey(item.id),
+                              startActionPane: ActionPane(
+                                motion: const BehindMotion(),
+                                extentRatio: 0.2,
+                                children: [
+                                  CustomSlidableAction(
+                                    backgroundColor: Colors.green,
+                                    onPressed: (context) => _markAsUsed(item),
+                                    child: const Icon(
+                                      Icons.check,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              endActionPane: ActionPane(
+                                motion: const BehindMotion(),
+                                extentRatio: 0.2,
+                                children: [
+                                  CustomSlidableAction(
+                                    backgroundColor: Colors.red,
+                                    onPressed: (context) => _deleteItem(item),
+                                    child: const Icon(
+                                      Icons.delete,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              child: _CosmeticListItem(
+                                item: item,
+                                status: status,
+                                onTap: () => _openEditScreen(item),
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                    ],
-                  ),
-                  endActionPane: ActionPane(
-                    motion: const BehindMotion(),
-                    extentRatio: 0.2,
-                    children: [
-                      CustomSlidableAction(
-                        backgroundColor: Colors.red,
-                        onPressed: (context) => _deleteItem(item),
-                        child: const Icon(Icons.delete, color: Colors.white),
-                      ),
-                    ],
-                  ),
-                  child: _CosmeticListItem(
-                    item: item,
-                    status: status,
-                    onTap: () => _openEditScreen(item),
-                  ),
-                );
-              },
-            ),
+              ),
+            ],
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openAddScreen,
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+
+/// Горизонтальная полоса с chips-фильтрами.
+class _FilterChips extends StatelessWidget {
+  final ItemStatus? selectedFilter;
+  final Map<ItemStatus, int> counts;
+  final ValueChanged<ItemStatus?> onSelected;
+
+  const _FilterChips({
+    required this.selectedFilter,
+    required this.counts,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final total = counts.values.fold(0, (a, b) => a + b);
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(color: Theme.of(context).dividerColor, width: 0.5),
+        ),
+      ),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        children: [
+          _FilterChipWidget(
+            label: 'Все',
+            count: total,
+            isSelected: selectedFilter == null,
+            color: Theme.of(context).colorScheme.primary,
+            onTap: () => onSelected(null),
+          ),
+          const SizedBox(width: 8),
+          _FilterChipWidget(
+            label: 'Просрочено',
+            count: counts[ItemStatus.expired] ?? 0,
+            isSelected: selectedFilter == ItemStatus.expired,
+            color: Colors.red,
+            onTap: () => onSelected(ItemStatus.expired),
+          ),
+          const SizedBox(width: 8),
+          _FilterChipWidget(
+            label: 'Скоро',
+            count: counts[ItemStatus.expiringSoon] ?? 0,
+            isSelected: selectedFilter == ItemStatus.expiringSoon,
+            color: Colors.orange,
+            onTap: () => onSelected(ItemStatus.expiringSoon),
+          ),
+          const SizedBox(width: 8),
+          _FilterChipWidget(
+            label: 'Используется',
+            count: counts[ItemStatus.active] ?? 0,
+            isSelected: selectedFilter == ItemStatus.active,
+            color: Colors.green,
+            onTap: () => onSelected(ItemStatus.active),
+          ),
+          const SizedBox(width: 8),
+          _FilterChipWidget(
+            label: 'Не открыто',
+            count: counts[ItemStatus.unopened] ?? 0,
+            isSelected: selectedFilter == ItemStatus.unopened,
+            color: Colors.blue,
+            onTap: () => onSelected(ItemStatus.unopened),
+          ),
+          const SizedBox(width: 8),
+          _FilterChipWidget(
+            label: 'Простаивает',
+            count: counts[ItemStatus.idle] ?? 0,
+            isSelected: selectedFilter == ItemStatus.idle,
+            color: Colors.grey,
+            onTap: () => onSelected(ItemStatus.idle),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Один chip-фильтр.
+class _FilterChipWidget extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool isSelected;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _FilterChipWidget({
+    required this.label,
+    required this.count,
+    required this.isSelected,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? color : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? color
+                : (isDark ? Colors.grey.shade700 : Colors.grey.shade400),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? Colors.white70 : Colors.black87),
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                count.toString(),
+                style: TextStyle(
+                  color: isSelected ? Colors.white : color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -213,27 +409,62 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.spa_outlined,
             size: 80,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            color: Theme.of(context).colorScheme.onSurface
+                .withValues(alpha: 0.3),
           ),
           const SizedBox(height: 16),
           Text(
             'Полка пуста',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.6),
-                ),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.6),
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Добавьте своё первое средство',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.5),
-                ),
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Виджет пустого состояния при активном фильтре.
+class _EmptyFilterState extends StatelessWidget {
+  const _EmptyFilterState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.filter_list_off,
+            size: 64,
+            color: Theme.of(context).colorScheme.onSurface
+                .withValues(alpha: 0.3),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Ничего не найдено',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Средств с таким статусом нет',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface
+                  .withValues(alpha: 0.5),
+            ),
           ),
         ],
       ),
@@ -266,10 +497,7 @@ class _CosmeticListItem extends StatelessWidget {
           color: colorScheme.onPrimaryContainer,
         ),
       ),
-      title: Text(
-        item.name,
-        style: Theme.of(context).textTheme.titleMedium,
-      ),
+      title: Text(item.name, style: Theme.of(context).textTheme.titleMedium),
       subtitle: Text(
         item.category.displayName,
         style: Theme.of(context).textTheme.bodyMedium,
