@@ -8,6 +8,10 @@ import 'package:polka/features/cosmetics/models/item_status.dart';
 import 'package:polka/features/cosmetics/presentation/add_cosmetic_screen.dart';
 import 'package:polka/features/cosmetics/presentation/edit_cosmetic_screen.dart';
 
+/// Запас снизу, чтобы последнее средство не пряталось под кнопкой «+»:
+/// 56 высота кнопки + 16 её отступ от края + 16 воздуха.
+const double _fabClearance = 88;
+
 /// Главный экран приложения — список косметических средств.
 class CosmeticsListScreen extends StatefulWidget {
   final CosmeticRepository repository;
@@ -229,89 +233,98 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
             IconButton(icon: const Icon(Icons.search), onPressed: _openSearch),
         ],
       ),
-      body: FutureBuilder<List<CosmeticItem>>(
-        future: _itemsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      // SafeArea сам знает, где проходит системная панель телефона,
+      // и не пускает контент под неё. Сверху не отступаем — там шапка.
+      body: SafeArea(
+        top: false,
+        child: FutureBuilder<List<CosmeticItem>>(
+          future: _itemsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          final items = snapshot.data ?? [];
+            final items = snapshot.data ?? [];
 
-          if (items.isEmpty) {
-            return const _EmptyState();
-          }
+            if (items.isEmpty) {
+              return const _EmptyState();
+            }
 
-          final counts = _countByStatus(items);
-          final displayedItems = _filterAndSortItems(items);
+            final counts = _countByStatus(items);
+            final displayedItems = _filterAndSortItems(items);
 
-          return Column(
-            children: [
-              _FilterChips(
-                selectedFilter: _selectedFilter,
-                counts: counts,
-                onSelected: (filter) {
-                  setState(() {
-                    _selectedFilter = filter;
-                  });
-                },
-              ),
-              Expanded(
-                child: displayedItems.isEmpty
-                    ? const _EmptyFilterState()
-                    : RefreshIndicator(
-                        onRefresh: () async => _refreshList(),
-                        child: ListView.separated(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          itemCount: displayedItems.length,
-                          separatorBuilder: (context, index) =>
-                              const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final item = displayedItems[index];
-                            final status = widget.calculator.calculate(item);
-                            return Slidable(
-                              key: ValueKey(item.id),
-                              startActionPane: ActionPane(
-                                motion: const BehindMotion(),
-                                extentRatio: 0.2,
-                                children: [
-                                  CustomSlidableAction(
-                                    backgroundColor: Colors.green,
-                                    onPressed: (context) => _markAsUsed(item),
-                                    child: const Icon(
-                                      Icons.check,
-                                      color: Colors.white,
+            return Column(
+              children: [
+                _FilterChips(
+                  selectedFilter: _selectedFilter,
+                  counts: counts,
+                  onSelected: (filter) {
+                    setState(() {
+                      _selectedFilter = filter;
+                    });
+                  },
+                ),
+                Expanded(
+                  child: displayedItems.isEmpty
+                      ? const _EmptyFilterState()
+                      : RefreshIndicator(
+                          onRefresh: () async => _refreshList(),
+                          child: ListView.separated(
+                            padding: const EdgeInsets.only(
+                              top: 8,
+                              bottom: _fabClearance,
+                            ),
+                            itemCount: displayedItems.length,
+                            separatorBuilder: (context, index) =>
+                                const Divider(height: 1),
+                            itemBuilder: (context, index) {
+                              final item = displayedItems[index];
+                              final status = widget.calculator.calculate(item);
+                              return Slidable(
+                                key: ValueKey(item.id),
+                                startActionPane: ActionPane(
+                                  motion: const BehindMotion(),
+                                  extentRatio: 0.2,
+                                  children: [
+                                    CustomSlidableAction(
+                                      backgroundColor: Colors.green,
+                                      onPressed: (context) => _markAsUsed(item),
+                                      child: const Icon(
+                                        Icons.check,
+                                        color: Colors.white,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              endActionPane: ActionPane(
-                                motion: const BehindMotion(),
-                                extentRatio: 0.2,
-                                children: [
-                                  CustomSlidableAction(
-                                    backgroundColor: Colors.red,
-                                    onPressed: (context) => _deleteItem(item),
-                                    child: const Icon(
-                                      Icons.delete,
-                                      color: Colors.white,
+                                  ],
+                                ),
+                                endActionPane: ActionPane(
+                                  motion: const BehindMotion(),
+                                  extentRatio: 0.2,
+                                  children: [
+                                    CustomSlidableAction(
+                                      backgroundColor: Colors.red,
+                                      onPressed: (context) => _deleteItem(item),
+                                      child: const Icon(
+                                        Icons.delete,
+                                        color: Colors.white,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              child: _CosmeticListItem(
-                                item: item,
-                                status: status,
-                                onTap: () => _openEditScreen(item),
-                              ),
-                            );
-                          },
+                                  ],
+                                ),
+                                child: _CosmeticListItem(
+                                  item: item,
+                                  status: status,
+                                  calculator: widget.calculator,
+                                  onTap: () => _openEditScreen(item),
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                      ),
-              ),
-            ],
-          );
-        },
+                ),
+              ],
+            );
+          },
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openAddScreen,
@@ -554,11 +567,13 @@ class _EmptyFilterState extends StatelessWidget {
 class _CosmeticListItem extends StatelessWidget {
   final CosmeticItem item;
   final ItemStatus status;
+  final ItemStatusCalculator calculator;
   final VoidCallback? onTap;
 
   const _CosmeticListItem({
     required this.item,
     required this.status,
+    required this.calculator,
     this.onTap,
   });
 
@@ -576,12 +591,75 @@ class _CosmeticListItem extends StatelessWidget {
         ),
       ),
       title: Text(item.name, style: Theme.of(context).textTheme.titleMedium),
-      subtitle: Text(
-        item.category.displayName,
-        style: Theme.of(context).textTheme.bodyMedium,
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            item.category.displayName,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            _infoText(),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: _infoColor(context)),
+          ),
+        ],
       ),
       trailing: _StatusBadge(status: status),
     );
+  }
+
+  /// Вторая строка: дата открытия и сколько осталось до истечения.
+  String _infoText() {
+    final openedAt = item.openedAt;
+    if (openedAt == null) {
+      return 'Не открыто';
+    }
+
+    final expiration = calculator.expirationDate(item);
+    if (expiration == null) {
+      return 'Открыто ${_formatDate(openedAt)}';
+    }
+
+    final left = calculator.daysLeft(item) ?? 0;
+    if (left > 0) {
+      return 'Открыто ${_formatDate(openedAt)} · осталось ${_pluralDays(left)}';
+    }
+    if (left == 0) {
+      return 'Истекает сегодня';
+    }
+    return 'Просрочено ${_pluralDays(-left)} назад';
+  }
+
+  /// Цвет второй строки: красный для просрочки, оранжевый для «скоро».
+  Color _infoColor(BuildContext context) {
+    switch (status) {
+      case ItemStatus.expired:
+        return Colors.red.shade900;
+      case ItemStatus.expiringSoon:
+        return Colors.orange.shade900;
+      default:
+        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$day.$month.${date.year}';
+  }
+
+  /// Правильное склонение: «1 день», «2 дня», «5 дней».
+  String _pluralDays(int n) {
+    final abs = n.abs();
+    final mod10 = abs % 10;
+    final mod100 = abs % 100;
+    if (mod10 == 1 && mod100 != 11) return '$n день';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+      return '$n дня';
+    }
+    return '$n дней';
   }
 
   IconData _iconForCategory(CosmeticCategory category) {

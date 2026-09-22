@@ -101,103 +101,107 @@ class _EditCosmeticScreenState extends State<EditCosmeticScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Редактирование')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Название средства',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Введите название';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-              DropdownButtonFormField<CosmeticCategory>(
-                initialValue: _selectedCategory,
-                decoration: const InputDecoration(
-                  labelText: 'Категория',
-                  border: OutlineInputBorder(),
-                ),
-                items: CosmeticCategory.values.map((category) {
-                  return DropdownMenuItem(
-                    value: category,
-                    child: Text(category.displayName),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _selectedCategory = value);
-                  }
-                },
-              ),
-              const SizedBox(height: 24),
-              SwitchListTile(
-                title: const Text('Средство открыто'),
-                subtitle: Text(
-                  _openedAt == null
-                      ? 'Ещё не открыто'
-                      : 'Открыто: ${_formatDate(_openedAt!)}',
-                ),
-                value: _openedAt != null,
-                onChanged: (value) {
-                  setState(() {
-                    if (value) {
-                      _openedAt = DateTime.now();
-                    } else {
-                      _openedAt = null;
+      // SafeArea не пускает контент под системную панель телефона.
+      body: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Название средства',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Введите название';
                     }
-                  });
-                },
-              ),
-              if (_openedAt != null)
-                TextButton.icon(
-                  onPressed: _pickOpenedDate,
-                  icon: const Icon(Icons.calendar_today),
-                  label: Text('Изменить дату: ${_formatDate(_openedAt!)}'),
-                ),
-              const SizedBox(height: 24),
-              TextFormField(
-                controller: _paoController,
-                decoration: const InputDecoration(
-                  labelText: 'Срок после вскрытия (PAO), месяцев',
-                  hintText: 'Например, 12',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  final text = value?.trim() ?? '';
-                  if (text.isEmpty) {
                     return null;
-                  }
-                  final parsed = int.tryParse(text);
-                  if (parsed == null || parsed <= 0) {
-                    return 'Введите число больше нуля';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
-              FilledButton.icon(
-                onPressed: _isSaving ? null : _save,
-                icon: _isSaving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.save),
-                label: Text(_isSaving ? 'Сохранение...' : 'Сохранить'),
-              ),
-            ],
+                  },
+                ),
+                const SizedBox(height: 24),
+                DropdownButtonFormField<CosmeticCategory>(
+                  initialValue: _selectedCategory,
+                  decoration: const InputDecoration(
+                    labelText: 'Категория',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: CosmeticCategory.values.map((category) {
+                    return DropdownMenuItem(
+                      value: category,
+                      child: Text(category.displayName),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedCategory = value);
+                    }
+                  },
+                ),
+                const SizedBox(height: 24),
+                SwitchListTile(
+                  title: const Text('Средство открыто'),
+                  subtitle: Text(
+                    _openedAt == null
+                        ? 'Ещё не открыто'
+                        : 'Открыто: ${_formatDate(_openedAt!)}',
+                  ),
+                  value: _openedAt != null,
+                  onChanged: (value) {
+                    setState(() {
+                      if (value) {
+                        _openedAt = DateTime.now();
+                      } else {
+                        _openedAt = null;
+                      }
+                    });
+                  },
+                ),
+                if (_openedAt != null)
+                  TextButton.icon(
+                    onPressed: _pickOpenedDate,
+                    icon: const Icon(Icons.calendar_today),
+                    label: Text('Изменить дату: ${_formatDate(_openedAt!)}'),
+                  ),
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: _paoController,
+                  decoration: const InputDecoration(
+                    labelText: 'Срок после вскрытия (PAO), месяцев',
+                    hintText: 'Например, 12',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    final text = value?.trim() ?? '';
+                    if (text.isEmpty) {
+                      return null;
+                    }
+                    final parsed = int.tryParse(text);
+                    if (parsed == null || parsed <= 0) {
+                      return 'Введите число больше нуля';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 32),
+                FilledButton.icon(
+                  onPressed: _isSaving ? null : _save,
+                  icon: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save),
+                  label: Text(_isSaving ? 'Сохранение...' : 'Сохранить'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

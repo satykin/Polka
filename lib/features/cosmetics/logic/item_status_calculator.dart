@@ -1,70 +1,88 @@
 import 'package:polka/features/cosmetics/models/cosmetic_item.dart';
 import 'package:polka/features/cosmetics/models/item_status.dart';
 
-/// Калькулятор статусов косметических средств
+/// Калькулятор статусов косметических средств.
+///
+/// Единственный источник правды о сроках: и статус, и дата истечения
+/// считаются здесь, чтобы UI и логика никогда не противоречили друг другу.
 class ItemStatusCalculator {
-  /// Порог для определения "скоро истекает" (в днях)
-  static const int expiringSoonDays = 30;
+  /// За сколько дней до истечения PAO средство считается «скоро истекающим».
+  static const int expiringSoonThresholdDays = 30;
 
-  /// Порог для определения "активное" (в днях)
-  static const int activeDays = 30;
+  /// Сколько дней без использования означает «простаивает».
+  static const int idleThresholdDays = 30;
 
-  /// Порог для определения "простаивает" (в днях)
-  static const int idleDays = 30;
-
-  /// Рассчитывает статус средства
-  ///
-  /// Приоритет статусов:
-  /// 1. expired
-  /// 2. expiringSoon
-  /// 3. unopened
-  /// 4. active
-  /// 5. idle
+  /// Рассчитывает статус средства на момент [now] (по умолчанию — сейчас).
   ItemStatus calculate(CosmeticItem item, {DateTime? now}) {
-    final currentDate = now ?? DateTime.now();
+    final moment = now ?? DateTime.now();
 
-    // Если средство не открыто — unopened
-    if (item.openedAt == null) {
+    final openedAt = item.openedAt;
+    if (openedAt == null) {
       return ItemStatus.unopened;
     }
 
-    // Если есть PAO — проверяем срок годности
-    if (item.paoMonths != null) {
-      final paoExpiration = _addMonths(item.openedAt!, item.paoMonths!);
+    final expiration = expirationDate(item);
+    if (expiration != null && !moment.isBefore(expiration)) {
+      return ItemStatus.expired;
+    }
 
-      // Если PAO истёк — expired
-      if (currentDate.isAfter(paoExpiration)) {
-        return ItemStatus.expired;
-      }
-
-      // Если до конца PAO осталось меньше 30 дней — expiringSoon
-      final daysUntilExpiration = paoExpiration.difference(currentDate).inDays;
-      if (daysUntilExpiration <= expiringSoonDays) {
+    if (expiration != null) {
+      final left = daysLeft(item, now: moment);
+      if (left != null && left <= expiringSoonThresholdDays) {
         return ItemStatus.expiringSoon;
       }
     }
 
-    // Если есть дата последнего использования
-    if (item.lastUsedAt != null) {
-      final daysSinceLastUse = currentDate.difference(item.lastUsedAt!).inDays;
-
-      // Если использовалось в последние 30 дней — active
-      if (daysSinceLastUse <= activeDays) {
-        return ItemStatus.active;
-      }
-
-      // Если давно не использовалось — idle
-      if (daysSinceLastUse > idleDays) {
-        return ItemStatus.idle;
-      }
+    final lastUsedAt = item.lastUsedAt;
+    if (lastUsedAt == null) {
+      return ItemStatus.idle;
     }
 
-    // Если средство открыто, но никогда не использовалось — idle
+    final daysSinceUse = daysBetween(lastUsedAt, moment);
+    if (daysSinceUse <= idleThresholdDays) {
+      return ItemStatus.active;
+    }
     return ItemStatus.idle;
   }
 
-  /// Добавляет месяцы к дате
-  DateTime _addMonths(DateTime date, int months) {
-    return DateTime(date.year, date.month + months, date.day);
+  /// Дата истечения средства: дата открытия + PAO в месяцах.
+  /// Null, если средство не открыто или PAO не указан.
+  DateTime? expirationDate(CosmeticItem item) {
+    final openedAt = item.openedAt;
+    final paoMonths = item.paoMonths;
+    if (openedAt == null || paoMonths == null) {
+      return null;
+    }
+    return addMonths(openedAt, paoMonths);
+  }
+
+  /// Сколько дней осталось до истечения срока.
+  /// Отрицательное число — средство просрочено.
+  /// Null, если дату истечения рассчитать нельзя.
+  int? daysLeft(CosmeticItem item, {DateTime? now}) {
+    final moment = now ?? DateTime.now();
+    final expiration = expirationDate(item);
+    if (expiration == null) {
+      return null;
+    }
+    return daysBetween(moment, expiration);
+  }
+
+  /// Добавляет [months] месяцев к дате, ограничивая день последним
+  /// днём целевого месяца (31.01 + 1 месяц = 28.02).
+  static DateTime addMonths(DateTime date, int months) {
+    final totalMonths = date.month - 1 + months;
+    final year = date.year + totalMonths ~/ 12;
+    final month = totalMonths % 12 + 1;
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final day = date.day > daysInMonth ? daysInMonth : date.day;
+    return DateTime(year, month, day);
+  }
+
+  /// Целое число дней между двумя датами (без учёта времени суток).
+  static int daysBetween(DateTime from, DateTime to) {
+    final fromDate = DateTime(from.year, from.month, from.day);
+    final toDate = DateTime(to.year, to.month, to.day);
+    return toDate.difference(fromDate).inDays;
   }
 }

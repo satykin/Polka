@@ -51,61 +51,65 @@ class _AddCosmeticScreenState extends State<AddCosmeticScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Новое средство')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Название средства',
-                  hintText: 'Например, Увлажняющий крем',
-                  border: OutlineInputBorder(),
+      // SafeArea не пускает контент под системную панель телефона.
+      body: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Название средства',
+                    hintText: 'Например, Увлажняющий крем',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Введите название';
+                    }
+                    return null;
+                  },
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _save(),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Введите название';
-                  }
-                  return null;
-                },
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) => _save(),
-              ),
-              const SizedBox(height: 24),
-              DropdownButtonFormField<CosmeticCategory>(
-                initialValue: _selectedCategory,
-                decoration: const InputDecoration(
-                  labelText: 'Категория',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 24),
+                DropdownButtonFormField<CosmeticCategory>(
+                  initialValue: _selectedCategory,
+                  decoration: const InputDecoration(
+                    labelText: 'Категория',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: CosmeticCategory.values.map((category) {
+                    return DropdownMenuItem(
+                      value: category,
+                      child: Text(category.displayName),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedCategory = value);
+                    }
+                  },
                 ),
-                items: CosmeticCategory.values.map((category) {
-                  return DropdownMenuItem(
-                    value: category,
-                    child: Text(category.displayName),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _selectedCategory = value);
-                  }
-                },
-              ),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: _isSaving ? null : _save,
-                icon: _isSaving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.save),
-                label: Text(_isSaving ? 'Сохранение...' : 'Сохранить'),
-              ),
-            ],
+                const Spacer(),
+                FilledButton.icon(
+                  onPressed: _isSaving ? null : _save,
+                  icon: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save),
+                  label: Text(_isSaving ? 'Сохранение...' : 'Сохранить'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
