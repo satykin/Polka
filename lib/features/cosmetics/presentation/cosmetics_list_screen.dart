@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:polka/features/cosmetics/data/cosmetic_repository.dart';
 import 'package:polka/features/cosmetics/logic/item_status_calculator.dart';
 import 'package:polka/features/cosmetics/models/cosmetic_category.dart';
@@ -250,6 +249,7 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
 
           final counts = _countByStatus(items);
           final displayedItems = _filterAndSortItems(items);
+          final actionExtent = MediaQuery.of(context).size.width * 0.22;
 
           return Column(
             children: [
@@ -278,41 +278,16 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
                           itemBuilder: (context, index) {
                             final item = displayedItems[index];
                             final status = widget.calculator.calculate(item);
-                            return Slidable(
-                              key: ValueKey(item.id),
-                              startActionPane: ActionPane(
-                                motion: const BehindMotion(),
-                                extentRatio: 0.2,
-                                children: [
-                                  CustomSlidableAction(
-                                    backgroundColor: Colors.green,
-                                    onPressed: (context) => _markAsUsed(item),
-                                    child: const Icon(
-                                      Icons.check,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              endActionPane: ActionPane(
-                                motion: const BehindMotion(),
-                                extentRatio: 0.2,
-                                children: [
-                                  CustomSlidableAction(
-                                    backgroundColor: Colors.red,
-                                    onPressed: (context) => _deleteItem(item),
-                                    child: const Icon(
-                                      Icons.delete,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            return _SwipeTile(
+                              itemId: item.id,
+                              actionExtent: actionExtent,
+                              onMarkUsed: () => _markAsUsed(item),
+                              onDelete: () => _deleteItem(item),
+                              onTap: () => _openEditScreen(item),
                               child: _CosmeticListItem(
                                 item: item,
                                 status: status,
                                 calculator: widget.calculator,
-                                onTap: () => _openEditScreen(item),
                               ),
                             );
                           },
@@ -327,6 +302,213 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
         onPressed: _openAddScreen,
         child: const Icon(Icons.add),
       ),
+    );
+  }
+}
+
+/// Плитка со свайпами и «фильтром намерения»: сдвигается только после
+/// уверенного горизонтального движения пальца, поэтому покачивания
+/// при вертикальной прокрутке никогда не открывают кнопки.
+class _SwipeTile extends StatefulWidget {
+  final String itemId;
+  final double actionExtent;
+  final Widget child;
+  final VoidCallback onMarkUsed;
+  final VoidCallback onDelete;
+  final VoidCallback onTap;
+
+  const _SwipeTile({
+    required this.itemId,
+    required this.actionExtent,
+    required this.child,
+    required this.onMarkUsed,
+    required this.onDelete,
+    required this.onTap,
+  });
+
+  @override
+  State<_SwipeTile> createState() => _SwipeTileState();
+}
+
+class _SwipeTileState extends State<_SwipeTile>
+    with SingleTickerProviderStateMixin {
+  /// Какая плитка сейчас открыта — чтобы открыта была только одна.
+  static final ValueNotifier<String?> _openId = ValueNotifier<String?>(null);
+
+  /// Минимальное горизонтальное смещение, после которого свайп «оживает».
+  static const double _engageThreshold = 32;
+
+  /// Насколько горизонтальное движение должно перевешивать вертикальное.
+  static const double _directionRatio = 2.5;
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 200),
+  );
+
+  double _offset = 0;
+  double _animFrom = 0;
+  double _animTo = 0;
+  double _accumDx = 0;
+  double _accumDy = 0;
+  bool _engaged = false;
+  bool _openTarget = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _openId.addListener(_handleOpenChanged);
+    _controller.addListener(() {
+      setState(() {
+        final t = Curves.easeOut.transform(_controller.value);
+        _offset = _animFrom + (_animTo - _animFrom) * t;
+      });
+    });
+  }
+
+  void _handleOpenChanged() {
+    if (!mounted) return;
+    if (_openId.value != widget.itemId && _openTarget) {
+      _openTarget = false;
+      _animateTo(0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _openId.removeListener(_handleOpenChanged);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _animateTo(double target) {
+    _animFrom = _offset;
+    _animTo = target;
+    _controller.forward(from: 0);
+  }
+
+  void _close() {
+    if (_openId.value == widget.itemId) {
+      _openId.value = null;
+    }
+    _openTarget = false;
+    _animateTo(0);
+  }
+
+  void _onDragDown(DragDownDetails details) {
+    _accumDx = 0;
+    _accumDy = 0;
+    _engaged = false;
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    if (!_engaged) {
+      _accumDx += details.delta.dx;
+      _accumDy += details.delta.dy;
+      // Фильтр намерения: палец явно едет вбок, а не вверх-вниз.
+      if (_accumDx.abs() > _engageThreshold &&
+          _accumDx.abs() > _accumDy.abs() * _directionRatio) {
+        _engaged = true;
+        _controller.stop();
+      } else {
+        return;
+      }
+    }
+    setState(() {
+      _offset = (_offset + details.delta.dx).clamp(
+        -widget.actionExtent,
+        widget.actionExtent,
+      );
+    });
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    if (!_engaged) return;
+    final half = widget.actionExtent / 2;
+    if (_offset > half) {
+      _openTarget = true;
+      _openId.value = widget.itemId;
+      _animateTo(widget.actionExtent);
+    } else if (_offset < -half) {
+      _openTarget = true;
+      _openId.value = widget.itemId;
+      _animateTo(-widget.actionExtent);
+    } else {
+      _close();
+    }
+  }
+
+  void _onDragCancel() {
+    if (_engaged) {
+      _close();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final openWidth = _offset.abs().clamp(0.0, widget.actionExtent);
+
+    return Stack(
+      children: [
+        // Зелёная зона слева (отметить как использованное).
+        if (_offset > 0)
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: openWidth,
+                child: ColoredBox(
+                  color: Colors.green,
+                  child: GestureDetector(
+                    onTap: () {
+                      _close();
+                      widget.onMarkUsed();
+                    },
+                    child: const Center(
+                      child: Icon(Icons.check, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        // Красная зона справа (удалить).
+        if (_offset < 0)
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(
+                width: openWidth,
+                child: ColoredBox(
+                  color: Colors.red,
+                  child: GestureDetector(
+                    onTap: widget.onDelete,
+                    child: const Center(
+                      child: Icon(Icons.delete, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        GestureDetector(
+          onHorizontalDragDown: _onDragDown,
+          onHorizontalDragUpdate: _onDragUpdate,
+          onHorizontalDragEnd: _onDragEnd,
+          onHorizontalDragCancel: _onDragCancel,
+          onTap: () {
+            if (_openTarget) {
+              _close();
+            } else {
+              widget.onTap();
+            }
+          },
+          child: Transform.translate(
+            offset: Offset(_offset, 0),
+            child: widget.child,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -565,13 +747,11 @@ class _CosmeticListItem extends StatelessWidget {
   final CosmeticItem item;
   final ItemStatus status;
   final ItemStatusCalculator calculator;
-  final VoidCallback? onTap;
 
   const _CosmeticListItem({
     required this.item,
     required this.status,
     required this.calculator,
-    this.onTap,
   });
 
   @override
@@ -579,7 +759,6 @@ class _CosmeticListItem extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return ListTile(
-      onTap: onTap,
       leading: CircleAvatar(
         backgroundColor: colorScheme.primaryContainer,
         child: Icon(
