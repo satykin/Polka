@@ -92,7 +92,7 @@ Future<void> seedDemoDataIfNeeded(CosmeticRepository repository) async {
   );
 }
 
-class PolkaApp extends StatelessWidget {
+class PolkaApp extends StatefulWidget {
   final CosmeticRepository repository;
   final ItemStatusCalculator calculator;
   final SettingsStorage settings;
@@ -105,16 +105,39 @@ class PolkaApp extends StatelessWidget {
   });
 
   @override
+  State<PolkaApp> createState() => _PolkaAppState();
+}
+
+class _PolkaAppState extends State<PolkaApp> {
+  late ThemeMode _themeMode;
+
+  @override
+  void initState() {
+    super.initState();
+    _themeMode = widget.settings.themeMode();
+  }
+
+  Future<void> _setThemeMode(ThemeMode mode) async {
+    setState(() {
+      _themeMode = mode;
+    });
+    await widget.settings.setThemeMode(mode);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Полка',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
+      themeMode: _themeMode,
       home: HomeShell(
-        repository: repository,
-        calculator: calculator,
-        settings: settings,
+        repository: widget.repository,
+        calculator: widget.calculator,
+        settings: widget.settings,
+        themeMode: _themeMode,
+        onThemeModeChanged: _setThemeMode,
       ),
     );
   }

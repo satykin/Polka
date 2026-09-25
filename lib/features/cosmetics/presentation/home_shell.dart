@@ -11,12 +11,16 @@ class HomeShell extends StatefulWidget {
   final CosmeticRepository repository;
   final ItemStatusCalculator calculator;
   final SettingsStorage settings;
+  final ThemeMode themeMode;
+  final ValueChanged<ThemeMode> onThemeModeChanged;
 
   const HomeShell({
     super.key,
     required this.repository,
     required this.calculator,
     required this.settings,
+    required this.themeMode,
+    required this.onThemeModeChanged,
   });
 
   @override
@@ -58,6 +62,8 @@ class _HomeShellState extends State<HomeShell> {
           CosmeticsListScreen(
             repository: widget.repository,
             calculator: widget.calculator,
+            themeMode: widget.themeMode,
+            onThemeModeChanged: widget.onThemeModeChanged,
           ),
           StatsScreen(
             repository: widget.repository,

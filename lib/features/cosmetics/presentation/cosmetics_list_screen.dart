@@ -15,11 +15,15 @@ const double _fabClearance = 88;
 class CosmeticsListScreen extends StatefulWidget {
   final CosmeticRepository repository;
   final ItemStatusCalculator calculator;
+  final ThemeMode themeMode;
+  final ValueChanged<ThemeMode> onThemeModeChanged;
 
   const CosmeticsListScreen({
     super.key,
     required this.repository,
     required this.calculator,
+    required this.themeMode,
+    required this.onThemeModeChanged,
   });
 
   @override
@@ -67,6 +71,53 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
       _isSearching = false;
       _searchQuery = '';
     });
+  }
+
+  /// Иконка текущего режима темы.
+  IconData get _themeIcon {
+    switch (widget.themeMode) {
+      case ThemeMode.dark:
+        return Icons.dark_mode;
+      case ThemeMode.light:
+        return Icons.light_mode;
+      case ThemeMode.system:
+        return Icons.brightness_auto;
+    }
+  }
+
+  /// Окно выбора темы оформления.
+  Future<void> _showThemeDialog() async {
+    final result = await showDialog<ThemeMode>(
+      context: context,
+      builder: (context) => RadioGroup<ThemeMode>(
+        groupValue: widget.themeMode,
+        onChanged: (value) {
+          if (value != null) {
+            Navigator.of(context).pop(value);
+          }
+        },
+        child: SimpleDialog(
+          title: const Text('Тема оформления'),
+          children: const [
+            RadioListTile<ThemeMode>(
+              title: Text('Системная'),
+              value: ThemeMode.system,
+            ),
+            RadioListTile<ThemeMode>(
+              title: Text('Светлая'),
+              value: ThemeMode.light,
+            ),
+            RadioListTile<ThemeMode>(
+              title: Text('Тёмная'),
+              value: ThemeMode.dark,
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result != null) {
+      widget.onThemeModeChanged(result);
+    }
   }
 
   /// Сортирует средства по приоритету статуса, а при равенстве —
@@ -228,6 +279,8 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
               )
             : null,
         actions: [
+          if (!_isSearching)
+            IconButton(icon: Icon(_themeIcon), onPressed: _showThemeDialog),
           if (!_isSearching)
             IconButton(icon: const Icon(Icons.search), onPressed: _openSearch),
         ],
