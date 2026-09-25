@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:polka/core/storage/settings_storage.dart';
 import 'package:polka/features/cosmetics/data/cosmetic_repository.dart';
 import 'package:polka/features/cosmetics/logic/item_status_calculator.dart';
 import 'package:polka/features/cosmetics/presentation/cosmetics_list_screen.dart';
+import 'package:polka/features/cosmetics/presentation/onboarding_dialog.dart';
 import 'package:polka/features/cosmetics/presentation/stats_screen.dart';
 
 /// Оболочка приложения с нижней панелью из двух вкладок.
 class HomeShell extends StatefulWidget {
   final CosmeticRepository repository;
   final ItemStatusCalculator calculator;
+  final SettingsStorage settings;
 
   const HomeShell({
     super.key,
     required this.repository,
     required this.calculator,
+    required this.settings,
   });
 
   @override
@@ -21,6 +25,27 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Показываем обучающую подсказку после первого кадра,
+    // но только один раз за всё время жизни приложения.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showOnboardingIfNeeded();
+    });
+  }
+
+  Future<void> _showOnboardingIfNeeded() async {
+    if (!mounted) return;
+    if (widget.settings.isOnboardingShown()) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => const OnboardingDialog(),
+    );
+    if (!mounted) return;
+    await widget.settings.setOnboardingShown(true);
+  }
 
   @override
   Widget build(BuildContext context) {

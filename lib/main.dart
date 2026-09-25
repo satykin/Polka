@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:polka/core/storage/settings_storage.dart';
 import 'package:polka/core/theme/app_theme.dart';
 import 'package:polka/features/cosmetics/data/cosmetic_repository.dart';
 import 'package:polka/features/cosmetics/data/hive_cosmetic_repository.dart';
@@ -14,12 +15,22 @@ void main() async {
   final repository = HiveCosmeticRepository();
   await repository.init();
 
+  // Открываем хранилище настроек приложения
+  final settings = SettingsStorage();
+  await settings.init();
+
   // Добавляем демо-средства, только если полка ещё пуста
   await seedDemoDataIfNeeded(repository);
 
   final calculator = ItemStatusCalculator();
 
-  runApp(PolkaApp(repository: repository, calculator: calculator));
+  runApp(
+    PolkaApp(
+      repository: repository,
+      calculator: calculator,
+      settings: settings,
+    ),
+  );
 }
 
 /// Добавляет демо-средства при самом первом запуске.
@@ -84,11 +95,13 @@ Future<void> seedDemoDataIfNeeded(CosmeticRepository repository) async {
 class PolkaApp extends StatelessWidget {
   final CosmeticRepository repository;
   final ItemStatusCalculator calculator;
+  final SettingsStorage settings;
 
   const PolkaApp({
     super.key,
     required this.repository,
     required this.calculator,
+    required this.settings,
   });
 
   @override
@@ -98,7 +111,11 @@ class PolkaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      home: HomeShell(repository: repository, calculator: calculator),
+      home: HomeShell(
+        repository: repository,
+        calculator: calculator,
+        settings: settings,
+      ),
     );
   }
 }
