@@ -44,9 +44,17 @@ class StatsScreen extends StatelessWidget {
           final counts = <ItemStatus, int>{
             for (final status in ItemStatus.values) status: 0,
           };
+          var totalSpent = 0.0;
+          var hasApprox = false;
           for (final item in items) {
             final status = calculator.calculate(item);
             counts[status] = (counts[status] ?? 0) + 1;
+            if (item.price != null) {
+              totalSpent += item.price!;
+              if (item.priceIsApproximate) {
+                hasApprox = true;
+              }
+            }
           }
 
           final expiring = items
@@ -63,6 +71,10 @@ class StatsScreen extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             children: [
               _TotalCard(count: items.length),
+              if (totalSpent > 0) ...[
+                const SizedBox(height: 16),
+                _SpentCard(total: totalSpent, hasApprox: hasApprox),
+              ],
               const SizedBox(height: 16),
               _StatusGrid(counts: counts),
               const SizedBox(height: 24),
@@ -188,6 +200,59 @@ class _TotalCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Карточка общей суммы потраченного.
+class _SpentCard extends StatelessWidget {
+  final double total;
+  final bool hasApprox;
+
+  const _SpentCard({required this.total, required this.hasApprox});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.payments,
+            size: 40,
+            color: colorScheme.onSecondaryContainer,
+          ),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${hasApprox ? '≈ ' : ''}${_formatMoney(total)} ₽',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSecondaryContainer,
+                ),
+              ),
+              Text(
+                'Всего потрачено',
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(color: colorScheme.onSecondaryContainer),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatMoney(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(2);
   }
 }
 

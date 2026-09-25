@@ -21,27 +21,43 @@ class EditCosmeticScreen extends StatefulWidget {
 class _EditCosmeticScreenState extends State<EditCosmeticScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
+  late final TextEditingController _priceController;
   late final TextEditingController _paoController;
   late CosmeticCategory _selectedCategory;
   late DateTime? _openedAt;
+  late DateTime? _purchasedAt;
+  late bool _priceIsApproximate;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.item.name);
+    _priceController = TextEditingController(
+      text: _priceToText(widget.item.price),
+    );
     _paoController = TextEditingController(
       text: widget.item.paoMonths?.toString() ?? '',
     );
     _selectedCategory = widget.item.category;
     _openedAt = widget.item.openedAt;
+    _purchasedAt = widget.item.purchasedAt;
+    _priceIsApproximate = widget.item.priceIsApproximate;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _priceController.dispose();
     _paoController.dispose();
     super.dispose();
+  }
+
+  /// Целые цены показываем без «.0»: 599 вместо 599.0
+  static String _priceToText(double? price) {
+    if (price == null) return '';
+    if (price == price.roundToDouble()) return price.toStringAsFixed(0);
+    return price.toString();
   }
 
   Future<void> _pickOpenedDate() async {
@@ -60,10 +76,32 @@ class _EditCosmeticScreenState extends State<EditCosmeticScreen> {
     }
   }
 
+  Future<void> _pickPurchasedDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _purchasedAt ?? now,
+      firstDate: DateTime(2000),
+      lastDate: now,
+    );
+    if (picked != null) {
+      setState(() {
+        _purchasedAt = picked;
+      });
+    }
+  }
+
   String _formatDate(DateTime date) {
     final day = date.day.toString().padLeft(2, '0');
     final month = date.month.toString().padLeft(2, '0');
     return '$day.$month.${date.year}';
+  }
+
+  /// Разрешаем вводить цену и с точкой, и с запятой.
+  double? _parsePrice() {
+    final text = _priceController.text.trim().replaceAll(',', '.');
+    if (text.isEmpty) return null;
+    return double.tryParse(text);
   }
 
   Future<void> _save() async {
@@ -74,14 +112,14 @@ class _EditCosmeticScreenState extends State<EditCosmeticScreen> {
       final paoText = _paoController.text.trim();
 
       // Создаём новую версию средства (вместо copyWith),
-      // чтобы иметь возможность очищать поля (openedAt, paoMonths)
+      // чтобы иметь возможность очищать поля (openedAt, paoMonths, цена)
       final updatedItem = CosmeticItem(
         id: widget.item.id,
         name: _nameController.text.trim(),
         category: _selectedCategory,
-        price: widget.item.price,
-        priceIsApproximate: widget.item.priceIsApproximate,
-        purchasedAt: widget.item.purchasedAt,
+        price: _parsePrice(),
+        priceIsApproximate: _priceIsApproximate,
+        purchasedAt: _purchasedAt,
         openedAt: _openedAt,
         paoMonths: paoText.isEmpty ? null : int.tryParse(paoText),
         lastUsedAt: widget.item.lastUsedAt,
@@ -141,6 +179,60 @@ class _EditCosmeticScreenState extends State<EditCosmeticScreen> {
                       setState(() => _selectedCategory = value);
                     }
                   },
+                ),
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: _priceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Цена, ₽ (необязательно)',
+                    hintText: 'Например, 599 или 599,90',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  validator: (value) {
+                    final text = (value ?? '').trim().replaceAll(',', '.');
+                    if (text.isEmpty) return null;
+                    final parsed = double.tryParse(text);
+                    if (parsed == null || parsed < 0) {
+                      return 'Введите положительное число';
+                    }
+                    return null;
+                  },
+                ),
+                SwitchListTile(
+                  title: const Text('Цена примерная'),
+                  value: _priceIsApproximate,
+                  onChanged: (value) {
+                    setState(() {
+                      _priceIsApproximate = value;
+                    });
+                  },
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton.icon(
+                        onPressed: _pickPurchasedDate,
+                        icon: const Icon(Icons.calendar_today),
+                        label: Text(
+                          _purchasedAt == null
+                              ? 'Указать дату покупки'
+                              : 'Куплено: ${_formatDate(_purchasedAt!)}',
+                        ),
+                      ),
+                    ),
+                    if (_purchasedAt != null)
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          setState(() {
+                            _purchasedAt = null;
+                          });
+                        },
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 24),
                 SwitchListTile(
