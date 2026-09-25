@@ -5,7 +5,7 @@ import 'package:polka/features/cosmetics/data/hive_cosmetic_repository.dart';
 import 'package:polka/features/cosmetics/logic/item_status_calculator.dart';
 import 'package:polka/features/cosmetics/models/cosmetic_category.dart';
 import 'package:polka/features/cosmetics/models/cosmetic_item.dart';
-import 'package:polka/features/cosmetics/presentation/cosmetics_list_screen.dart';
+import 'package:polka/features/cosmetics/presentation/home_shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -98,7 +98,7 @@ class PolkaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      home: CosmeticsListScreen(repository: repository, calculator: calculator),
+      home: HomeShell(repository: repository, calculator: calculator),
     );
   }
 }

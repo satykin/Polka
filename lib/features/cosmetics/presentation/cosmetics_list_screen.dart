@@ -233,98 +233,95 @@ class _CosmeticsListScreenState extends State<CosmeticsListScreen> {
             IconButton(icon: const Icon(Icons.search), onPressed: _openSearch),
         ],
       ),
-      // SafeArea сам знает, где проходит системная панель телефона,
-      // и не пускает контент под неё. Сверху не отступаем — там шапка.
-      body: SafeArea(
-        top: false,
-        child: FutureBuilder<List<CosmeticItem>>(
-          future: _itemsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
+      // Системные отступы снизу обрабатывает нижняя панель оболочки,
+      // поэтому SafeArea здесь не нужен.
+      body: FutureBuilder<List<CosmeticItem>>(
+        future: _itemsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-            final items = snapshot.data ?? [];
+          final items = snapshot.data ?? [];
 
-            if (items.isEmpty) {
-              return const _EmptyState();
-            }
+          if (items.isEmpty) {
+            return const _EmptyState();
+          }
 
-            final counts = _countByStatus(items);
-            final displayedItems = _filterAndSortItems(items);
+          final counts = _countByStatus(items);
+          final displayedItems = _filterAndSortItems(items);
 
-            return Column(
-              children: [
-                _FilterChips(
-                  selectedFilter: _selectedFilter,
-                  counts: counts,
-                  onSelected: (filter) {
-                    setState(() {
-                      _selectedFilter = filter;
-                    });
-                  },
-                ),
-                Expanded(
-                  child: displayedItems.isEmpty
-                      ? const _EmptyFilterState()
-                      : RefreshIndicator(
-                          onRefresh: () async => _refreshList(),
-                          child: ListView.separated(
-                            padding: const EdgeInsets.only(
-                              top: 8,
-                              bottom: _fabClearance,
-                            ),
-                            itemCount: displayedItems.length,
-                            separatorBuilder: (context, index) =>
-                                const Divider(height: 1),
-                            itemBuilder: (context, index) {
-                              final item = displayedItems[index];
-                              final status = widget.calculator.calculate(item);
-                              return Slidable(
-                                key: ValueKey(item.id),
-                                startActionPane: ActionPane(
-                                  motion: const BehindMotion(),
-                                  extentRatio: 0.2,
-                                  children: [
-                                    CustomSlidableAction(
-                                      backgroundColor: Colors.green,
-                                      onPressed: (context) => _markAsUsed(item),
-                                      child: const Icon(
-                                        Icons.check,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                endActionPane: ActionPane(
-                                  motion: const BehindMotion(),
-                                  extentRatio: 0.2,
-                                  children: [
-                                    CustomSlidableAction(
-                                      backgroundColor: Colors.red,
-                                      onPressed: (context) => _deleteItem(item),
-                                      child: const Icon(
-                                        Icons.delete,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                child: _CosmeticListItem(
-                                  item: item,
-                                  status: status,
-                                  calculator: widget.calculator,
-                                  onTap: () => _openEditScreen(item),
-                                ),
-                              );
-                            },
+          return Column(
+            children: [
+              _FilterChips(
+                selectedFilter: _selectedFilter,
+                counts: counts,
+                onSelected: (filter) {
+                  setState(() {
+                    _selectedFilter = filter;
+                  });
+                },
+              ),
+              Expanded(
+                child: displayedItems.isEmpty
+                    ? const _EmptyFilterState()
+                    : RefreshIndicator(
+                        onRefresh: () async => _refreshList(),
+                        child: ListView.separated(
+                          padding: const EdgeInsets.only(
+                            top: 8,
+                            bottom: _fabClearance,
                           ),
+                          itemCount: displayedItems.length,
+                          separatorBuilder: (context, index) =>
+                              const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final item = displayedItems[index];
+                            final status = widget.calculator.calculate(item);
+                            return Slidable(
+                              key: ValueKey(item.id),
+                              startActionPane: ActionPane(
+                                motion: const BehindMotion(),
+                                extentRatio: 0.2,
+                                children: [
+                                  CustomSlidableAction(
+                                    backgroundColor: Colors.green,
+                                    onPressed: (context) => _markAsUsed(item),
+                                    child: const Icon(
+                                      Icons.check,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              endActionPane: ActionPane(
+                                motion: const BehindMotion(),
+                                extentRatio: 0.2,
+                                children: [
+                                  CustomSlidableAction(
+                                    backgroundColor: Colors.red,
+                                    onPressed: (context) => _deleteItem(item),
+                                    child: const Icon(
+                                      Icons.delete,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              child: _CosmeticListItem(
+                                item: item,
+                                status: status,
+                                calculator: widget.calculator,
+                                onTap: () => _openEditScreen(item),
+                              ),
+                            );
+                          },
                         ),
-                ),
-              ],
-            );
-          },
-        ),
+                      ),
+              ),
+            ],
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openAddScreen,
